@@ -30,11 +30,7 @@ final case class All[D, E, R](val f: Array[Arrow[D, E, R]]) extends Operations
 
 final case class Race[D, E, R](val f: Array[Arrow[D, E, R]]) extends Operations
 
-final case class Bracket[D, D2, E, R](val f: R => Arrow[D, E, Any], val g: R => Arrow[D2, E, R]) extends Operations
-// type bracket = {
-//   _tag: Ops.bracket
-//   f: [(_:any) => Arrow<any, any, any>, (_:any) => Arrow<any, any, any>]
-// }
+final case class Bracket[D, D2, E, R, R2](val f: R => Arrow[D, Nothing, Any], val g: R => Arrow[D2, E, R2]) extends Operations
 
 // type construct = {
 //   _tag: Ops.construct,
