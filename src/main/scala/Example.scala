@@ -2,6 +2,7 @@ import lightarrow.Arrow
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.collection.mutable.{ Stack }
+import scala.util.{ Success, Failure }
 
 object Main {
 
@@ -9,22 +10,26 @@ object Main {
 
     val x = Arrow.resolve(5)
       .flatMap(a => {
-        // println("flatMap")
-        println(a)
-        Arrow.resolve(a + 1)
-      })
-      .groupSecond(Arrow.resolve(8))
-      .flatMap(a => {
-        Arrow.reject(5)
-      })
-      .flatMap(a => {
-        Thread.sleep(2000)
-        Arrow.resolve(a)
+        throw new Exception("boom")
       })
       .run(null)
-    println("block")
-    Thread.sleep(1000)
-    x.cancel()
+
+    x.f.onComplete {
+      case Success(ea) => ea match {
+        case Right(a) => { 
+          println("right")
+          println(a)
+        }
+        case Left(e) => {
+          println("left")
+          println(e)
+        }
+      }
+      case Failure(t) => {
+        println("fail")
+        println(t)
+      }
+    }
     Thread.sleep(3000)
     // trait user {
     //   def a: String
