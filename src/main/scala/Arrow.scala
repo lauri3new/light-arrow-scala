@@ -21,11 +21,13 @@ class Arrow[-D, E, R] private (val ops: List[Operations]) {
 
   def flatMap[D2 <: D, E1, R2](f: R => Arrow[D2, E1, R2]) = new Arrow[D2, E | E1, R2](ops :+ FlatMap(f))
 
-  def group[D2 <: D, E1, R2](f: Arrow[D2, E1, R2]) = new Arrow[D, E | E1, (R, R2)](ops :+ Group(f))
+  def group[D2 <: D, E1, R2](f: Arrow[D2, E1, R2]) = new Arrow[D2, E | E1, (R, R2)](ops :+ Group(f))
 
-  def groupFirst[D2 <: D, E1, R2](f: Arrow[D2, E1, R2]) = new Arrow[D, E | E1, (R, R2)](ops :+ GroupFirst(f))
+  def groupParallel[D2 <: D, E1, R2](f: Arrow[D2, E1, R2]) = new Arrow[D2, E | E1, (R, R2)](List(GroupParallel(this, f)))
 
-  def groupSecond[D2 <: D, E1, R2](f: Arrow[D2, E1, R2]) = new Arrow[D, E | E1, (R, R2)](ops :+ GroupSecond(f))
+  def groupFirst[D2 <: D, E1, R2](f: Arrow[D2, E1, R2]) = new Arrow[D2, E | E1, (R, R2)](ops :+ GroupFirst(f))
+
+  def groupSecond[D2 <: D, E1, R2](f: Arrow[D2, E1, R2]) = new Arrow[D2, E | E1, (R, R2)](ops :+ GroupSecond(f))
 
   def run(d: D): Cancellable[Either[E, R]] = Runner[D, E, R](d, ops).run
 
