@@ -15,6 +15,9 @@ object Main {
       })
       .groupSecond(Arrow.resolve(8))
       .flatMap(a => {
+        Arrow.reject(5)
+      })
+      .flatMap(a => {
         Thread.sleep(2000)
         Arrow.resolve(a)
       })

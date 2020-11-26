@@ -5,7 +5,7 @@ import scala.concurrent.Future
 import Either._
 import Right._
 
-// reference recursive implementation - not stack safe
+// reference recursive implementation - not stack safe, just for demonstration
 
 object RArrow {
   def apply[D, E, R](v: D => Future[Either[E, R]]) = new RArrow(v)

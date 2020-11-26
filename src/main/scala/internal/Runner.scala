@@ -87,6 +87,27 @@ class Runner[D, E, R](context: D, operations: List[Operations]) {
               }
             })
           }
+          case GroupParallel(f): GroupParallel[Any, Any, Any, Any, Any, Any] => {
+            block = true
+            for {
+              ea: Either[Any, Any] <- f(0).run(context).f
+              eb: Either[Any, Any] <- f(1).run(context).f
+            } yield {
+              val xx = ea.flatMap(a => eb.flatMap(b => Right(b, a)))
+              xx match {
+              case Right(a) => {
+                block = false
+                _run
+              }
+              case Left(e) => {
+                error = e
+                isLeft = true
+                block = false
+                _run
+              }
+            }
+            }
+          }
           case GroupFirst(f): GroupFirst[Any, Any, Any] => {
             block = true
             f.run(context).f.foreach(ea => ea match {
@@ -118,7 +139,66 @@ class Runner[D, E, R](context: D, operations: List[Operations]) {
               }
             })
           }
-          case _ => {}
+          case AndThen(f): AndThen[Any, Any, Any] => {
+            block = true
+            f.run(result).f.foreach(ea => ea match {
+              case Right(a) => {
+                result = a
+                block = false
+                _run
+              }
+              case Left(e) => {
+                error = e
+                isLeft = true
+                block = false
+                _run
+              }
+            })
+          }
+          case All(f): All[Any, Any, Any] => {
+            block = true
+            Future.sequence(
+              f.map(a => a.run(context).f)
+            )
+            .map(
+              aas => aas.foldLeft(Right(Array[Any]()))((eb: Either[Any, Array[Any]], ea: Either[Any, Any]) => ea.flatMap(a => eb.flatMap(b => Right(b :+ a))))
+            )
+            .foreach(aas => {
+              result = aas
+              block = false
+              _run
+            })
+          }
+          case Race(f): Race[Any, Any, Any] => {
+            block = true
+            Future.firstCompletedOf(
+              f.map(a => a.run(context).f)
+            )
+            .foreach(aas => {
+              result = aas
+              block = false
+              _run
+            })
+          }
+          case Bracket(f, g): Bracket[Any, Any, Any, Any] => {
+            block = true
+            f(result).run(context).f.foreach(ea => {
+              ea match {
+                case Right(a) => {
+                  result = a
+                }
+                case Left(e) => {
+                  error = e
+                  isLeft = true
+                }
+              }
+              g(result).run(context).f.foreach((eb) => {
+                block = false
+                _run
+              })
+            })
+          }
+          case _ => { }
         }
       }
     }
