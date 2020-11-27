@@ -5,7 +5,7 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.util.{ Failure, Success }
 
 // TODO: add some kind of truly cancellable Future
-case class Cancellable[A](cancel: () => Unit, f: Future[A])
+case class Cancellable[A](cancel: () => Unit, future: Future[A])
 
 // TODO: think about exception handling
 class Runner[D, E, R](context: D, operations: List[Operations]) {
@@ -79,7 +79,7 @@ class Runner[D, E, R](context: D, operations: List[Operations]) {
           }
           case Group(f): Group[Any, Any, Any] => {
             block = true
-            f.run(context).f.onComplete {
+            f.runAsCFuture(context).future.onComplete {
               case Success(ea) => ea match {
                 case Right(a) => {
                   result = (result, a)
@@ -99,8 +99,8 @@ class Runner[D, E, R](context: D, operations: List[Operations]) {
           case GroupParallel(f): GroupParallel[Any, Any, Any, Any, Any, Any] => {
             block = true
             val xx = for {
-              ea: Either[Any, Any] <- f(0).run(context).f
-              eb: Either[Any, Any] <- f(1).run(context).f
+              ea: Either[Any, Any] <- f(0).runAsCFuture(context).future
+              eb: Either[Any, Any] <- f(1).runAsCFuture(context).future
             } yield (ea.flatMap(a => eb.flatMap(b => Right(b, a))))
             xx.onComplete {
               case Success(ea) => ea match {
@@ -121,7 +121,7 @@ class Runner[D, E, R](context: D, operations: List[Operations]) {
           }
           case GroupFirst(f): GroupFirst[Any, Any, Any] => {
             block = true
-            f.run(context).f.onComplete {
+            f.runAsCFuture(context).future.onComplete {
               case Success(ea) => ea match {
                 case Right(a) => {
                   block = false
@@ -139,7 +139,7 @@ class Runner[D, E, R](context: D, operations: List[Operations]) {
           }
           case GroupSecond(f): GroupSecond[Any, Any, Any] => {
             block = true
-            f.run(context).f.onComplete {
+            f.runAsCFuture(context).future.onComplete {
               case Success(ea) => ea match {
                 case Right(a) => {
                   result = a
@@ -158,7 +158,7 @@ class Runner[D, E, R](context: D, operations: List[Operations]) {
           }
           case AndThen(f): AndThen[Any, Any, Any] => {
             block = true
-            f.run(result).f.onComplete {
+            f.runAsCFuture(result).future.onComplete {
               case Success(ea) => ea match {
                 case Right(a) => {
                   result = a
@@ -178,7 +178,7 @@ class Runner[D, E, R](context: D, operations: List[Operations]) {
           case All(f): All[Any, Any, Any] => {
             block = true
             Future.sequence(
-              f.map(a => a.run(context).f)
+              f.map(a => a.runAsCFuture(context).future)
             )
             .onComplete {
               case Success(aas) => aas.foldLeft(Right(Array[Any]()))((eb: Either[Any, Array[Any]], ea: Either[Any, Any]) => ea.flatMap(a => eb.flatMap(b => Right(b :+ a)))) match {
@@ -200,7 +200,7 @@ class Runner[D, E, R](context: D, operations: List[Operations]) {
           case Race(f): Race[Any, Any, Any] => {
             block = true
             Future.firstCompletedOf(
-              f.map(a => a.run(context).f)
+              f.map(a => a.runAsCFuture(context).future)
             )
             .onComplete {
               case Success(ea) => ea match {
@@ -221,7 +221,7 @@ class Runner[D, E, R](context: D, operations: List[Operations]) {
           }
           case Bracket(f, g): Bracket[Any, Any, Any, Any, Any] => {
             block = true
-            f(result).run(context).f.onComplete(ma => { ma match {
+            f(result).runAsCFuture(context).future.onComplete(ma => { ma match {
               case Success(ea) => ea match {
                 case Right(a) => {
                   result = a
@@ -237,7 +237,7 @@ class Runner[D, E, R](context: D, operations: List[Operations]) {
               }
               case Failure(t) => p.failure(t)
             }
-            g(result).run(context).f.onComplete {
+            g(result).runAsCFuture(context).future.onComplete {
               case Success(_) => _run
               case Failure(t) => p.failure(t)
             }

@@ -2,6 +2,7 @@ package lightarrow
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import internal._
+import scala.util.{ Success, Failure }
 
 import Either._
 import Right._
@@ -42,6 +43,34 @@ class Arrow[-D, E, R] private (val ops: List[Operations]) {
 
   def andThen[D2 <: D, E2, R2](f: Arrow[D2, E2, R2]) = new Arrow[D2, E | E2, R2](ops :+ AndThen(f))
 
-  def run(d: D): Cancellable[Either[E, R]] = Runner[D, E, R](d, ops).run
+  def runAsCFuture(d: D): Cancellable[Either[E, R]] = Runner[D, E, R](d, ops).run
+
+  def runAsFuture(d: D): Future[Either[E, R]] = Runner[D, E, R](d, ops).run.future
+
+  def run(
+    dependencies: D,
+    f: R => Unit,
+    g: E => Unit,
+    h: Throwable => Unit
+  ): () => Unit = {
+    val CFuture = Runner[D, E, R](dependencies, ops).run
+    var _cancel = false
+    CFuture.future.onComplete {
+      case Success(eitherR) => {
+        if (!_cancel) {
+          eitherR match {
+            case Right(r) => f(r)
+            case Left(e) => g(e)
+          }
+        }
+      }
+      case Failure(t) => h(t)
+    }
+    def cancel() = {
+      CFuture.cancel()
+      _cancel = true
+    }
+    cancel
+  }
 
 }
