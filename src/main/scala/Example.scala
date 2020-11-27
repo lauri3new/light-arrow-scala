@@ -12,9 +12,9 @@ object Main {
       .flatMap(a => {
         throw new Exception("boom")
       })
-      .run(null)
+      .runAsCFuture(null)
 
-    x.f.onComplete {
+    x.future.onComplete {
       case Success(ea) => ea match {
         case Right(a) => { 
           println("right")
