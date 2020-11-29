@@ -1,4 +1,5 @@
 package internal
+import scala.annotation.tailrec
 import scala.collection.mutable.{ Stack }
 import scala.concurrent.{ Future, Promise }
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -17,14 +18,37 @@ class Runner[D, E, R](context: D, operations: List[Operations]) {
   private var result: Any = null
   private var isLeft: Boolean = false
   private var error: Any = null
+  private var batchcount = 0
   def cancel(): Unit = {
     _cancel = true
   }
+
+  def runConstruct(f: (Any => Unit, Any => Unit) => Unit, cb: => Future[Any]) = {
+    var pending = true
+    val resolve = (a: Any) => {
+      result = a
+      pending = false
+    }
+    val reject = (a: Any) => {
+      isLeft = true
+      error = a
+      pending = false
+    }
+    f(resolve, reject)
+    while (!pending) {
+      batchcount += 1
+    }
+    pending = false
+    block = true
+    cb
+  }
+
   def run: Cancellable[Either[E, R]] = {
     val p = Promise[Either[E, R]]()
     def _run: Future[Any] = Future {
       try {
       while (!block) {
+        batchcount += 1
         if (_cancel) {
           p.success(Right(null.asInstanceOf[R]))
         }
@@ -35,6 +59,11 @@ class Runner[D, E, R](context: D, operations: List[Operations]) {
             p.success(Right(result.asInstanceOf[R]))
           }
         }
+        if (batchcount > 2048) {
+          block = false
+          batchcount = 0
+          _run
+        } else {
         val op = stack.pop()
         if (isLeft) {
           op match {
@@ -58,6 +87,10 @@ class Runner[D, E, R](context: D, operations: List[Operations]) {
           case FlatMap(f): FlatMap[Any, Any, Any, Any, Any] => {
             stack.pushAll(f(result).ops)
           }
+          case Construct(f): Construct[Any, Any] => {
+            block = true
+            runConstruct(f, _run)
+          }
           case FutureBased(f): FutureBased[Any, Any, Any] => {
             block = true
             f(context).onComplete {
@@ -65,12 +98,14 @@ class Runner[D, E, R](context: D, operations: List[Operations]) {
                 case Right(a) => {
                   result = a
                   block = false
+                  batchcount = 0
                   _run
                 }
                 case Left(e) => {
                   error = e
                   isLeft = true
                   block = false
+                  batchcount = 0
                   _run
                 }
               }
@@ -84,12 +119,14 @@ class Runner[D, E, R](context: D, operations: List[Operations]) {
                 case Right(a) => {
                   result = (result, a)
                   block = false
+                  batchcount = 0
                   _run
                 }
                 case Left(e) => {
                   error = e
                   isLeft = true
                   block = false
+                  batchcount = 0
                   _run
                 }
               }
@@ -107,12 +144,14 @@ class Runner[D, E, R](context: D, operations: List[Operations]) {
                 case Right(a) => {
                   result = (result, a)
                   block = false
+                  batchcount = 0
                   _run
                 }
                 case Left(e) => {
                   error = e
                   isLeft = true
                   block = false
+                  batchcount = 0
                   _run
                 }
               }
@@ -125,12 +164,14 @@ class Runner[D, E, R](context: D, operations: List[Operations]) {
               case Success(ea) => ea match {
                 case Right(a) => {
                   block = false
+                  batchcount = 0
                   _run
                 }
                 case Left(e) => {
                   error = e
                   isLeft = true
                   block = false
+                  batchcount = 0
                   _run
                 }
               }
@@ -144,12 +185,14 @@ class Runner[D, E, R](context: D, operations: List[Operations]) {
                 case Right(a) => {
                   result = a
                   block = false
+                  batchcount = 0
                   _run
                 }
                 case Left(e) => {
                   error = e
                   isLeft = true
                   block = false
+                  batchcount = 0
                   _run
                 }
               }
@@ -163,12 +206,14 @@ class Runner[D, E, R](context: D, operations: List[Operations]) {
                 case Right(a) => {
                   result = a
                   block = false
+                  batchcount = 0
                   _run
                 }
                 case Left(e) => {
                   error = e
                   isLeft = true
                   block = false
+                  batchcount = 0
                   _run
                 }
               }
@@ -185,12 +230,14 @@ class Runner[D, E, R](context: D, operations: List[Operations]) {
                 case Right(aaas) => {
                   result = aaas
                   block = false
+                  batchcount = 0
                   _run
                 }
                 case Left(e) => {
                   error = e
                   isLeft = true
                   block = false
+                  batchcount = 0
                   _run
                 }
               }
@@ -207,12 +254,14 @@ class Runner[D, E, R](context: D, operations: List[Operations]) {
                 case Right(a) => {
                   result = a
                   block = false
+                  batchcount = 0
                   _run
                 }
                 case Left(e) => {
                   error = e
                   isLeft = true
                   block = false
+                  batchcount = 0
                   _run
                 }
               }
@@ -226,12 +275,14 @@ class Runner[D, E, R](context: D, operations: List[Operations]) {
                 case Right(a) => {
                   result = a
                   block = false
+                  batchcount = 0
                   _run
                 }
                 case Left(e) => {
                   error = e
                   isLeft = true
                   block = false
+                  batchcount = 0
                   _run
                 }
               }
@@ -246,6 +297,7 @@ class Runner[D, E, R](context: D, operations: List[Operations]) {
           case _ => { }
         }
       }
+    }
     } catch {
         case e: Throwable => p.failure(e)
       }
