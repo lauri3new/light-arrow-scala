@@ -31,4 +31,15 @@ class SafetyTest extends AsyncFunSuite {
       case Right(r) => assert(r == 1)
     }
   }
+  test("Arrow should construct") {
+    Arrow.construct[Nothing, Int]((resolve, reject) => {
+      Thread.sleep(50)
+      resolve(5)
+    })
+    .map(a => a + 1)
+    .runAsFuture(null)
+    .map {
+      case Right(r) => assert(r == 6)
+    }
+  }
 }

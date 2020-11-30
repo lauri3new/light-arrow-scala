@@ -13,6 +13,8 @@ object Arrow {
 
   def resolve[R](f: R) = new Arrow[Any, Nothing, R](List(Value(f)))
 
+  def construct[E, R](f: ((R => Unit), (E => Unit)) => Unit) = new Arrow[Any, Nothing, R](List(Construct(f)))
+
   def reject[D, R](f: R) = Arrow((d: D) => Future(Left(f)))
 
   def all[D, E, R](f: Array[Arrow[D, E, R]]) = new Arrow[D, E, R](List(All(f)))
