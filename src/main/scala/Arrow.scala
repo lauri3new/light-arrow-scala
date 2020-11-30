@@ -25,7 +25,7 @@ object Arrow {
 
 }
 
-class Arrow[-D, E, R] private (val ops: List[Operations]) {
+class Arrow[-D, +E, +R] private (val ops: List[Operations]) {
 
   def map[R2](f: R => R2) = new Arrow[D, E, R2](ops :+ Map(f))
 
@@ -40,6 +40,8 @@ class Arrow[-D, E, R] private (val ops: List[Operations]) {
   def groupSecond[D2 <: D, E2, R2](f: Arrow[D2, E2, R2]) = new Arrow[D2, E | E2, R2](ops :+ GroupSecond(f))
 
   def bracket[D2 <: D, D3 <: D2, E2, R2](f: R => Arrow[D2, Nothing, Any], g: R => Arrow[D3, E2, R2]) = new Arrow[D3, E | E2, R2](ops :+ Bracket(f, g))
+
+  def biMap[E2, R2](f: E => E2, g: R => R2) = new Arrow[D, E2, R](ops :+ LeftMap(f) :+ Map(g))
 
   def leftMap[E2](f: E => E2) = new Arrow[D, E2, R](ops :+ LeftMap(f))
 

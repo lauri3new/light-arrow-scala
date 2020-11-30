@@ -6,7 +6,7 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.util.{ Failure, Success }
 
 // TODO: add some kind of truly cancellable Future
-case class Cancellable[A](cancel: () => Unit, future: Future[A])
+case class Cancellable[+A](cancel: () => Unit, future: Future[A])
 
 // TODO: think about exception handling
 class Runner[D, E, R](context: D, operations: List[Operations]) {

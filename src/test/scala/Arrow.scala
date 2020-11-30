@@ -12,7 +12,8 @@ class ArrowTest extends AsyncFunSuite {
       .map {
         case Right(r) => assert(r == 3)
       }
-    }
+  }
+
   test("Arrow should be immutable - a") {
     val a = Arrow.resolve(1)
     val b = a.map(x => x * 2)
@@ -35,7 +36,13 @@ class ArrowTest extends AsyncFunSuite {
 
   test("Arrow should map - E") {
     Arrow.resolve(1)
-    .flatMap(b => Arrow.reject(1))
+    .flatMap(b => {
+      if (b > 0) {
+        Arrow.reject(1)
+      } else {
+        Arrow.resolve(1)
+      }
+    })
     .map(x => x * 3)
       .runAsFuture(null)
       .map {
@@ -43,71 +50,79 @@ class ArrowTest extends AsyncFunSuite {
       }
   }
 
-// it('Arrow should map - fail', async () => {
-//   const { error, result } = await Arrow<{}, never, number>(async () => Right(1))
-//     .flatMap(() => Arrow<{}, number, never>(async () => Left(1)))
-//     .map(a => a * 3)
-//     .runAsPromise({})
-//   expect(result).toEqual(1)
-//   expect(error).toEqual(1)
-// })
+  test("Arrow should flatMap") {
+    Arrow.resolve(1)
+      .flatMap(a => Arrow.resolve(a * 3))
+      .runAsFuture(null)
+      .map {
+        case Right(r) => assert(r == 3)
+      }
+  }
 
-// it('Arrow should flatMap', async () => {
-//   const result = await Arrow<{}, never, number>(async () => Right(1))
-//     .flatMap(a => Arrow<{}, never, number>(async () => Right(a * 3)))
-//     .runAsPromiseResult({})
-//   expect(result).toEqual(3)
-// })
+  test("Arrow should flatMap - fail") {
+    Arrow.resolve(1)
+      .flatMap(a => Arrow.reject(a * 3))
+      .runAsFuture(null)
+      .map {
+        case Left(r) => assert(r == 3)
+      }
+  }
 
-// it('Arrow should flatMap - fail', async () => {
-//   const { error, result } = await Arrow<{}, number, never>(async () => Left(1))
-//     .flatMap(a => Arrow<{}, never, number>(async () => Right(a * 3)))
-//     .runAsPromise({})
-//   expect(result).toEqual(undefined)
-//   expect(error).toEqual(1)
-// })
+  test("Arrow should leftMap") {
+    Arrow.reject(1)
+      .leftMap(a => a * 3)
+      .runAsFuture(null)
+      .map {
+        case Left(r) => assert(r == 3)
+      }
+  }
 
-// it('Arrow should leftMap', async () => {
-//   const {
-//     error
-//   } = await Arrow<{}, number, never>(async () => Left(1))
-//     .leftMap(a => a * 3)
-//     .runAsPromise({})
-//   expect(error).toEqual(3)
-// })
+  test("Arrow should biMap") {
+    Arrow.construct[Int, Int]((resolve, reject) => {
+      if (3 < 5) {
+        resolve(5)
+      } else {
+        reject(5)
+      }
+    })
+      .biMap(
+        a => a * 2,
+        a => a * 3
+      )
+      .runAsFuture(null)
+      .map {
+        case Right(r) => assert(r == 15)
+      }
+  }
 
-// it('Arrow should biMap - right', async () => {
-//   const {
-//     error, result
-//   } = await Arrow<{}, never, number>(async () => Right(1))
-//     .biMap(
-//       a => a * 3,
-//       a => a * 5
-//     )
-//     .runAsPromise({})
-//   expect(result).toEqual(5)
-//   expect(error).toEqual(undefined)
-// })
+  test("Arrow should biMap - left") {
+    Arrow.construct[Int, Int]((resolve, reject) => {
+      if (5 < 3) {
+        resolve(5)
+      } else {
+        reject(5)
+      }
+    })
+      .biMap(
+        a => a * 2,
+        a => a * 3
+      )
+      .runAsFuture(null)
+      .map {
+        case Left(r) => assert(r == 10)
+      }
+  }
 
-// it('Arrow should biMap - left', async () => {
-//   const {
-//     error, result
-//   } = await Arrow<{}, number, never>(async () => Left(1))
-//     .biMap(
-//       a => a * 3,
-//       a => a * 5
-//     )
-//     .runAsPromise({})
-//   expect(result).toEqual(undefined)
-//   expect(error).toEqual(3)
-// })
-
-// it('Arrow should group', async () => {
-//   const result = await Arrow<{}, never, number>(async () => Right(1))
-//     .group(Arrow<{}, never, number>(async () => Right(2)))
-//     .runAsPromiseResult({})
-//   expect(result).toEqual([1, 2])
-// })
+  test("Arrow should group") {
+    Arrow.resolve(1).group(Arrow.resolve(2))
+      .runAsFuture(null)
+      .map {
+        case Right((a, b)) => {
+          assert(a == 1)
+          assert(b == 2)
+        }
+      }
+  }
 
 // it('Arrow should group - fail', async () => {
 //   const { result, error } = await Arrow<{}, never, number>(async () => Right(1))
