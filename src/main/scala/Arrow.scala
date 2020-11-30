@@ -9,6 +9,8 @@ import Right._
 
 object Arrow {
 
+  // TODO: add combinators
+
   def apply[D, E, R](f: D => Future[Either[E, R]]) = new Arrow[D, E, R](List(FutureBased(f)))
 
   def resolve[R](f: R) = new Arrow[Any, Nothing, R](List(Value(f)))
