@@ -8,28 +8,28 @@ object Main {
 
   def main(args: Array[String]): Unit = {
 
-    val x = Arrow.resolve(5)
-      .flatMap(a => {
-        throw new Exception("boom")
-      })
-      .runAsCFuture(null)
+    // val x = Arrow.resolve(5)
+    //   .flatMap(a => {
+    //     throw new Exception("boom")
+    //   })
+    //   .runAsCFuture(null)
 
-    x.future.onComplete {
-      case Success(ea) => ea match {
-        case Right(a) => { 
-          println("right")
-          println(a)
-        }
-        case Left(e) => {
-          println("left")
-          println(e)
-        }
-      }
-      case Failure(t) => {
-        println("fail")
-        println(t)
-      }
-    }
+    // x.future.onComplete {
+    //   case Success(ea) => ea match {
+    //     case Right(a) => { 
+    //       println("right")
+    //       println(a)
+    //     }
+    //     case Left(e) => {
+    //       println("left")
+    //       println(e)
+    //     }
+    //   }
+    //   case Failure(t) => {
+    //     println("fail")
+    //     println(t)
+    //   }
+    // }
     Thread.sleep(3000)
     // trait user {
     //   def a: String
