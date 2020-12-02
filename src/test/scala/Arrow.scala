@@ -300,8 +300,6 @@ class ArrowTest extends AsyncFunSuite {
       .run(
         10,
         a => {
-          println("z2")
-          println(a)
           p.success(a)
         },
         a => { },

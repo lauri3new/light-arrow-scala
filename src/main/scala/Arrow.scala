@@ -52,6 +52,7 @@ class Arrow[-D, +E, +R] private (val ops: List[Operations]) {
 
   def runAsFuture(d: D): Future[Either[E, R]] = Runner[D, E, R](d, ops).run.future
 
+  // TODO: execution context with default param?
   def run(
     dependencies: D,
     f: R => Unit,
