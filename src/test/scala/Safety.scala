@@ -31,10 +31,36 @@ class SafetyTest extends AsyncFunSuite {
       case Right(r) => assert(r == 1)
     }
   }
-  test("Arrow should construct") {
+
+  test("Arrow construct should be stack safe") {
+    def a(n: Int): Arrow[Any, Nothing, Int] = {
+      if (n == 1) {
+        Arrow.construct((resolve) => resolve(1))
+      } else {
+        Arrow.construct((resolve) => resolve(1)).flatMap(_ => a(n - 1))
+      }
+    }
+    
+    a(10)
+    .runAsFuture(null)
+    .map {
+      case Right(r) => assert(r == 1)
+    }
+  }
+  
+  test("Arrow should construct - 1") {
     Arrow.construct[Nothing, Int]((resolve, reject) => {
-      Thread.sleep(50)
       resolve(5)
+    })
+    .map(a => a + 1)
+    .runAsFuture(null)
+    .map {
+      case Right(r) => assert(r == 6)
+    }
+  }
+  test("Arrow should construct - 2") {
+    Arrow.construct[Nothing, Int]((resolve, reject) => {
+      sleep(100)(resolve(5))
     })
     .map(a => a + 1)
     .runAsFuture(null)

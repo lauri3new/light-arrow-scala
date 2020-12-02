@@ -2,6 +2,7 @@
 import org.scalatest.funsuite._
 import lightarrow.Arrow
 import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.{ Future, Promise }
 import scala.util.{ Success, Failure }
 
 class ArrowTest extends AsyncFunSuite {
@@ -124,191 +125,245 @@ class ArrowTest extends AsyncFunSuite {
       }
   }
 
-// it('Arrow should group - fail', async () => {
-//   const { result, error } = await Arrow<{}, never, number>(async () => Right(1))
-//     .group(Arrow<{}, number, never>(async () => Left(2)))
-//     .runAsPromise({})
-//   expect(result).toEqual(1)
-//   expect(error).toEqual(2)
-// })
+  test("Arrow should group - fail") {
+    Arrow.resolve(1).group(Arrow.reject(2))
+      .runAsFuture(null)
+      .map {
+        case Left((b)) => {
+          assert(b == 2)
+        }
+      }
+  }
 
-// it('Arrow should group first', async () => {
-//   const result = await Arrow<{}, never, number>(async () => Right(1))
-//     .groupFirst(Arrow<{}, never, number>(async () => Right(2)))
-//     .runAsPromiseResult({})
-//   expect(result).toEqual(1)
-// })
+  test("Arrow should groupFirst") {
+    var x = 0
+    Arrow.resolve(1).groupFirst(Arrow((a) => {
+      x += 1
+      Future(Right(2))
+    }))
+      .runAsFuture(null)
+      .map {
+        case Right(b) => {
+          assert(x == 1)
+          assert(b == 1)
+        }
+    }
+  }
 
-// it('Arrow should group second', async () => {
-//   const result = await Arrow<{}, never, number>(async () => Right(1))
-//     .groupSecond(Arrow<{}, never, number>(async () => Right(2)))
-//     .runAsPromiseResult({})
-//   expect(result).toEqual(2)
-// })
+  test("Arrow should groupSecond") {
+    var x = 0
+    Arrow((_) => {
+      x += 1
+      Future(Right(2))
+    }).groupSecond(Arrow.resolve(1))
+      .runAsFuture(null)
+      .map {
+        case Right(b) => {
+          assert(x == 1)
+          assert(b == 1)
+        }
+    }
+  }
 
-// it('Arrow should group', async () => {
-//   const result = await Arrow<{}, never, number>(async () => Right(1))
-//     .group(Arrow<{}, never, number>(async () => Right(2)))
-//     .runAsPromiseResult({})
-//   expect(result).toEqual([1, 2])
-// })
+  test("Arrow should andThen") {
+    Arrow.resolve[Int](2)
+      .andThen[Nothing, Int](Arrow((a: Int) => Future(Right(a + 1))))
+      .runAsFuture(null)
+      .map {
+        case Right(b) => {
+          assert(b == 3)
+        }
+    }
+  }
 
-// it('Arrow should andThen', async () => {
-//   const result = await Arrow<{}, never, number>(async () => Right(1))
-//     .andThen(Arrow<number, never, number>(async (a) => Right(a + 2)))
-//     .runAsPromiseResult({})
-//   expect(result).toEqual(3)
-// })
+  test("Arrow should orElse") {
+    Arrow.reject(2)
+      .orElse(Arrow.resolve(3))
+      .runAsFuture(null)
+      .map {
+        case Right(b) => {
+          assert(b == 3)
+        }
+    }
+  }
 
-// it('Arrow should orElse', async () => {
-//   const result = await Arrow<{}, number, never>(async () => Left(1))
-//     .orElse(Arrow<{}, never, number>(async () => Right(2)))
-//     .runAsPromiseResult({})
-//   expect(result).toEqual(2)
-// })
+  test("Arrow should bracket") {
+    var flag = false
+    val a = Arrow.resolve(3)
+      .bracket(
+        (b) => {
+          assert(flag == false)
+          flag = true
+          Arrow.resolve(null)
+        }, (c) => {
+          assert(flag == false)
+          Arrow.resolve(10)
+        })
+    a
+      .map(b => b + 1)
+      .runAsFuture(null)
+      .map {
+        case Right(a) => {
+          assert(a == 11)
+          assert(flag == true)
+        }
+      }
+    }
 
-// it('Arrow should orElse', async () => {
-//   const a = Arrow<{}, number, never>(async () => Left(1))
-//     .orElse(Arrow<{}, number, never>(async () => Left(2)))
+  test("Arrow should bracket - fail") {
+    var flag = false
+    val a = Arrow.resolve(3)
+      .bracket(
+        (b) => {
+          assert(flag == false)
+          flag = true
+          Arrow.resolve(null)
+        }, (c) => {
+          assert(flag == false)
+          Arrow.reject(10)
+        })
+    a
+      .runAsFuture(null)
+      .map {
+        case Left(a) => {
+          assert(a == 10)
+          assert(flag == true)
+        }
+      }
+    }
 
-//   const result = await a.orElse(Arrow<{}, never, number>(async () => Right(2)))
-//     .runAsPromiseResult({})
-//   expect(result).toEqual(2)
-// })
+  test("Arrow should run - success") {
+    var x: Any = 1
+    Arrow.resolve(5)
+      .run(
+        null,
+        a => {
+          x = a + 1
+        },
+        a => {
+          x = a
+        },
+        a => {
+          x = a
+        }
+      )
+    Thread.sleep(100)
+    assert(x == 6)
+  }
 
-// it('Arrow should bracket', async () => {
-//   let flag = false
-//   const a = Arrow<{}, never, { ok: number }>(async () => Right({ ok: 123 }))
-//     .bracket(
-//       (b) => {
-//         expect(flag).toEqual(false)
-//         flag = true
-//         return resolve(null)
-//       }
-//     )((c) => {
-//       expect(flag).toEqual(false)
-//       return resolve<number, {}>(10)
-//     })
-//   const { result, context } = await a
-//     .runAsPromise({})
-//   expect(flag).toEqual(true)
-//   expect(result).toEqual(10)
-// })
+  test("Arrow should run - error") {
+    var x: Any = 1
+    Arrow.reject(5)
+      .run(
+        null,
+        a => {
+          x = a
+        },
+        a => {
+          x = a + 1
+        },
+        a => {
+          x = a
+        }
+      )
+    Thread.sleep(100)
+    assert(x == 6)
+  }
 
-// it('Arrow should bracket - fail case', async () => {
-//   let flag = false
-//   const a = Arrow<{}, never, { ok: number }>(async () => Right({ ok: 123 }))
-//     .bracket(
-//       (b) => {
-//         expect(flag).toEqual(false)
-//         flag = true
-//         return resolve(null)
-//       }
-//     )(
-//       (c) => {
-//         expect(flag).toEqual(false)
-//         return reject(10)
-//       }
-//     )
-//   const { result, error, context } = await a
-//     .runAsPromise({})
-//   expect(flag).toEqual(true)
-//   expect(error).toEqual(10)
-// })
+  test("Arrow should run - exception") {
+    var x: Any = 1
+    Arrow((_) => {
+      throw new Exception("hello")
+      Future(Right(5))
+    })
+      .run(
+        null,
+        a => {
+          x = a
+        },
+        a => {
+          x = 6
+        },
+        a => {
+          x = 7
+        }
+      )
+    Thread.sleep(100)
+    assert(x == 7)
+  }
 
-// it('Arrow should run - success', async () => {
-//   const a = Arrow<{ok:() => number }, never, number>(async (a) => Right(a.ok()))
-//   const result = await a.run(
-//     { ok: () => 2 },
-//     result => {
-//       expect(result).toEqual(2)
-//     },
-//     error => { },
-//     failure => { }
-//   )
-// })
+  test("Arrow should run - context") {
+    val p = Promise[Any]()
+    Arrow((a: Int) => {
+      Future(Right(a))
+    })
+      .run(
+        10,
+        a => {
+          println("z2")
+          println(a)
+          p.success(a)
+        },
+        a => { },
+        a => { }
+      )
+    p.future.map(a => assert(a == 10))
+  }
 
-// it('Arrow should run - error', async () => {
-//   const a = Arrow<{ok:() => number }, number, never>(async (a) => Left(a.ok()))
-//   const result = a.run(
-//     { ok: () => 2 },
-//     result => { },
-//     error => {
-//       expect(error).toEqual(2)
-//     },
-//     failure => { }
-//   )
-// })
+  test("Arrow should run") {
+    var x: Any = 1
+    val cancel = Arrow((a: Int) => {
+      Thread.sleep(100)
+      Future(Right(a))
+    })
+      .run(
+        10,
+        a => {
+          println("should be run")
+          x = a
+        },
+        a => { },
+        a => { }
+      )
+    sleep(2000)(assert(x == 10))
+  }
 
-// it('Arrow should run - failure', async () => {
-//   const a = Arrow<{ok:() => number }, number, never>(async (a) => { throw new Error('boom') })
-//   const result = a.run(
-//     { ok: () => 2 },
-//     result => { },
-//     error => { },
-//     failure => {
-//       expect(failure?.message).toEqual('boom')
-//     }
-//   )
-// })
+  test("Arrow should run and cancel") {
+    var x: Any = 1
+    val cancel = Arrow((a: Int) => {
+      Thread.sleep(100)
+      Future(Right(a))
+    })
+      .run(
+        10,
+        a => {
+          x = a
+        },
+        a => { },
+        a => { }
+      )
+    cancel()
+    sleep(2000)(assert(x == 1))
+  }
 
-// it('Arrow should run - context', async () => {
-//   const a = Arrow<{ok:() => number }, never, number>(async (a) => Right(a.ok()))
-//   const result = a.run(
-//     { ok: () => 2 },
-//     result => {
-//       expect(result).toEqual(2)
-//     },
-//     error => { },
-//     failure => { },
-//     context => {
-//       expect(context.ok()).toEqual(2)
-//     }
-//   )
-// })
-
-// it('Arrow should run no cancel', async () => {
-//   let res = 0
-//   const a = Arrow<{ok:() => number }, never, number>(async (a) => {
-//     await sleep(100)
-//     return Right(a.ok())
-//   })
-//   const cancel = await a.run(
-//     { ok: () => 2 },
-//     result => {
-//       res = result
-//       expect(result).toEqual(2)
-//     },
-//     error => { }
-//   )
-//   await sleep(200)
-//   expect(res).toEqual(2)
-// })
-
-// it('Arrow should run and cancel', async () => {
-//   let res = 0
-//   const a = Arrow<{ok:() => number }, never, number>(async (a) => {
-//     await sleep(100)
-//     res = 2
-//     return Right(a.ok())
-//   })
-//   const cancel = await a.run(
-//     { ok: () => 2 },
-//     result => {
-//       res = result
-//     },
-//     error => { }
-//   )
-//   cancel()
-//   await sleep(200)
-//   expect(res).toEqual(0)
-// })
-
-
-// it('Arrow should run as promise result - success', async () => {
-//   const a = Arrow<{ok:() => number }, never, number>(async (a) => Right(a.ok()))
-//   const result = await a.runAsPromiseResult({ ok: () => 2 })
-//   expect(result).toEqual(2)
-// })
+  test("Arrow should runAsFuture") {
+    var x: Any = 1
+    val a = Arrow((a: Int) => {
+      Thread.sleep(100)
+      Future(Right(a))
+    })
+      .runAsFuture(
+        10
+      )
+      .onComplete {
+        case Success(_) => {
+          x = 10
+        }
+        case Failure(_) => {
+          x = 10
+        }
+      }
+    sleep(2000)(assert(x == 10))
+  }
 
 }

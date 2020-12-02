@@ -4,9 +4,6 @@ import scala.concurrent.Future
 import internal._
 import scala.util.{ Success, Failure }
 
-import Either._
-import Right._
-
 object Arrow {
 
   // TODO: add combinators
@@ -17,11 +14,13 @@ object Arrow {
 
   def construct[E, R](f: ((R => Unit), (E => Unit)) => Unit) = new Arrow[Any, E, R](List(Construct(f)))
 
-  def reject[D, R](f: R) = Arrow((d: D) => Future(Left(f)))
+  def construct[E, R](f: ((R => Unit)) => Unit) = new Arrow[Any, E, R](List(ConstructRes(f)))
 
-  def all[D, E, R](f: Array[Arrow[D, E, R]]) = new Arrow[D, E, R](List(All(f)))
+  def reject[R](f: R) = new Arrow[Any, R, Nothing](List(LeftValue(f)))
 
-  def race[D, E, R](f: Array[Arrow[D, E, R]]) = new Arrow[D, E, R](List(Race(f)))
+  // def all[D, E, R](f: Array[Arrow[D, E, R]]) = new Arrow[D, E, Array[R]](List(All(f)))
+
+  // def race[D, E, R](f: Array[Arrow[D, E, R]]) = new Arrow[D, E, R](List(Race(f)))
 
 }
 
@@ -47,7 +46,7 @@ class Arrow[-D, +E, +R] private (val ops: List[Operations]) {
 
   def orElse[D2 <: D, E2, R2](f: Arrow[D2, E2, R2]) = new Arrow[D2, E2, R | R2](ops :+ OrElse(f))
 
-  def andThen[D2 <: D, E2, R2](f: Arrow[D2, E2, R2]) = new Arrow[D2, E | E2, R2](ops :+ AndThen(f))
+  def andThen[E2, R2](f: Arrow[R, E2, R2]) = new Arrow[D, E | E2, R2](ops :+ AndThen(f))
 
   def runAsCFuture(d: D): Cancellable[Either[E, R]] = Runner[D, E, R](d, ops).run
 
@@ -70,10 +69,14 @@ class Arrow[-D, +E, +R] private (val ops: List[Operations]) {
           }
         }
       }
-      case Failure(t) => h(t)
+      case Failure(t) => {
+        if (!_cancel) {
+          h(t)
+        }
+      }
     }
     def cancel() = {
-      CFuture.cancel()
+      CFuture.unsafeCancel()
       _cancel = true
     }
     cancel
