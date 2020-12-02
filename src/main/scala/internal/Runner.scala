@@ -14,7 +14,6 @@ class Runner[D, E, R](context: D, operations: List[Operations]) {
   // TODO: refactor mutations to methods
   private var _cancel = false
   private var stack = operations.to(Stack)
-  private var block = false
   private var result: Any = null
   private var isLeft: Boolean = false
   private var error: Any = null
@@ -30,7 +29,7 @@ class Runner[D, E, R](context: D, operations: List[Operations]) {
       p.success(null)
     }
     f(resolve)
-    Future(null).flatMap((_) => p.future)
+    p.future
   }
 
   def runConstruct(f: (Any => Unit, Any => Unit) => Unit) = {
@@ -45,14 +44,13 @@ class Runner[D, E, R](context: D, operations: List[Operations]) {
       p.success(null)
     }
     f(resolve, reject)
-    Future(null).flatMap((_) => p.future)
+    p.future
   }
 
   def run: Cancellable[Either[E, R]] = {
     val p = Promise[Either[E, R]]()
     def _run: Future[Any] = Future {
       try {
-      while (!block) {
         if (_cancel) {
           p.success(Right(null.asInstanceOf[R]))
         }
@@ -68,59 +66,58 @@ class Runner[D, E, R](context: D, operations: List[Operations]) {
           op match {
             case LeftMap(f): LeftMap[Any, Any] => {
               error = f(error)
+              _run
             }
             case OrElse(f): OrElse[Any, Any, Any] => {
               isLeft = false
               stack.pushAll(f.ops)
+              _run
             }
-            case _ => {}
+            case _ => _run
           }
         }
         op match {
           case Value(f) => {
             result = f
+            _run
           }
           case LeftValue(f) => {
             isLeft = true
             error = f
+            _run
           }
           case Map(f): Map[Any, Any] => {
             result = f(result)
+            _run
           }
           case FlatMap(f): FlatMap[Any, Any, Any, Any, Any] => {
             stack.pushAll(f(result).ops)
+            _run
           }
           case Construct(f): Construct[Any, Any] => {
-            block = true
             runConstruct(f).onComplete {
               _ => {
-                block = false
                 _run 
               }
             }
           }
           case ConstructRes(f): ConstructRes[Any, Any] => {
-            block = true
             runConstructRes(f).onComplete {
               _ => {
-                block = false
                 _run
               }
             }
           }
           case FutureBased(f): FutureBased[Any, Any, Any] => {
-            block = true
             f(context).onComplete {
               case Success(ea) => ea match {
                 case Right(a) => {
                   result = a
-                  block = false
                   _run
                 }
                 case Left(e) => {
                   error = e
                   isLeft = true
-                  block = false
                   _run
                 }
               }
@@ -128,18 +125,15 @@ class Runner[D, E, R](context: D, operations: List[Operations]) {
             }
           }
           case Group(f): Group[Any, Any, Any] => {
-            block = true
             f.runAsCFuture(context).future.onComplete {
               case Success(ea) => ea match {
                 case Right(a) => {
                   result = (result, a)
-                  block = false
                   _run
                 }
                 case Left(e) => {
                   error = e
                   isLeft = true
-                  block = false
                   _run
                 }
               }
@@ -147,7 +141,6 @@ class Runner[D, E, R](context: D, operations: List[Operations]) {
             }
           }
           case GroupParallel(f): GroupParallel[Any, Any, Any, Any, Any, Any] => {
-            block = true
             val xx = for {
               ea: Either[Any, Any] <- f(0).runAsCFuture(context).future
               eb: Either[Any, Any] <- f(1).runAsCFuture(context).future
@@ -156,13 +149,11 @@ class Runner[D, E, R](context: D, operations: List[Operations]) {
               case Success(ea) => ea match {
                 case Right(a) => {
                   result = (result, a)
-                  block = false
                   _run
                 }
                 case Left(e) => {
                   error = e
                   isLeft = true
-                  block = false
                   _run
                 }
               }
@@ -170,17 +161,14 @@ class Runner[D, E, R](context: D, operations: List[Operations]) {
             }
           }
           case GroupFirst(f): GroupFirst[Any, Any, Any] => {
-            block = true
             f.runAsCFuture(context).future.onComplete {
               case Success(ea) => ea match {
                 case Right(a) => {
-                  block = false
                   _run
                 }
                 case Left(e) => {
                   error = e
                   isLeft = true
-                  block = false
                   _run
                 }
               }
@@ -188,18 +176,15 @@ class Runner[D, E, R](context: D, operations: List[Operations]) {
             }
           }
           case GroupSecond(f): GroupSecond[Any, Any, Any] => {
-            block = true
             f.runAsCFuture(context).future.onComplete {
               case Success(ea) => ea match {
                 case Right(a) => {
                   result = a
-                  block = false
                   _run
                 }
                 case Left(e) => {
                   error = e
                   isLeft = true
-                  block = false
                   _run
                 }
               }
@@ -207,18 +192,15 @@ class Runner[D, E, R](context: D, operations: List[Operations]) {
             }
           }
           case AndThen(f): AndThen[Any, Any, Any] => {
-            block = true
             f.runAsCFuture(result).future.onComplete {
               case Success(ea) => ea match {
                 case Right(a) => {
                   result = a
-                  block = false
                   _run
                 }
                 case Left(e) => {
                   error = e
                   isLeft = true
-                  block = false
                   _run
                 }
               }
@@ -226,18 +208,15 @@ class Runner[D, E, R](context: D, operations: List[Operations]) {
             }
           }
           case Bracket(f, g): Bracket[Any, Any, Any, Any, Any] => {
-            block = true
             g(result).runAsCFuture(context).future.onComplete(ma => { ma match {
               case Success(ea) => ea match {
                 case Right(a) => {
                   result = a
-                  block = false
                   _run
                 }
                 case Left(e) => {
                   error = e
                   isLeft = true
-                  block = false
                   _run
                 }
               }
@@ -249,11 +228,10 @@ class Runner[D, E, R](context: D, operations: List[Operations]) {
             }
           })
           }
-          case _ => { }
+          case _ => _run
         }
-      }
-    } catch {
-        case e: Throwable => p.failure(e)
+      } catch {
+       case e: Throwable => p.failure(e)
       }
     }
     _run
