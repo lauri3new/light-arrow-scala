@@ -8,6 +8,7 @@ trait Monad[F[_]] {
   def of[A](a:A): F[A]
 }
 
+
 // scala 3 stuff
 object Monad {
   def apply[T[_]](using m: Monad[T]) = m

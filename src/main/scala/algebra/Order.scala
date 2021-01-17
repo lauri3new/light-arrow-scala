@@ -49,7 +49,7 @@ given Order[Suit] with
     }
   }
 
-// combinators
+// operations // the pay off
 
 def maximum[A: Order](x: A, y: A) = if (Order[A].compare(x, y) == Ord.GT) then x else y
 def minimum = ???
