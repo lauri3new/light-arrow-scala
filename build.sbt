@@ -1,4 +1,4 @@
-val dottyVersion = "3.0.0-M1"
+val dottyVersion = "3.0.0-M3"
 
 lazy val root = project
   .in(file("."))
@@ -6,5 +6,5 @@ lazy val root = project
     name := "lightarrow",
     version := "0.1.0",
     scalaVersion := dottyVersion,
-    libraryDependencies += "org.scalatest" % "scalatest-funsuite_3.0.0-M1" % "3.2.3"
+    libraryDependencies += "org.scalatest" % "scalatest-funsuite_3.0.0-M3" % "3.2.3"
   )
