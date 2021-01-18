@@ -36,16 +36,20 @@ def none[A]: Option[A] = None
 
 // combinators
 
-def forEach[T[_]: Monad, A](x: T[A])(f: A => Unit) = Monad[T].flatMap(x)(a => {
-  f(a)
-  Monad[T].of(a)
-})
-def map2[T[_]: Monad, A, B, Z](x: T[A], y: T[B])(f: (A, B) => Z) = Monad[T].flatMap(x)(a => Monad[T].map(y)(b => f(a, b)))
+extension [T[_]: Monad, A, B, Z](x: T[A])
+  def forEach(f: A => Unit) = Monad[T].flatMap(x)(a => {
+    f(a)
+    Monad[T].of(a)
+  })
+  def map2(y: T[B])(f: (A, B) => Z) = Monad[T].flatMap(x)(a => Monad[T].map(y)(b => f(a, b)))
+
 
 object MonadApp {
   def main(args: Array[String]): Unit = {
-    println(map2(some("jim"), none)((a, b) => "hello " + a + b))
-    val x = map2(FPFuture(() => Future(5)), FPFuture(() => Future(10)))((a, b) => a + b)
-    forEach(x)(a => println(a)).run()
+    val x = some("jim").map2(none)((a, b) => "hello " + a + b)
+    println(x)
+    val y = FPFuture(() => Future(5)).map2(FPFuture(() => Future(10)))((a, b) => a + b)
+    val z = y.forEach(a => println(a))
+    z.run() // run effect
   }
 }
