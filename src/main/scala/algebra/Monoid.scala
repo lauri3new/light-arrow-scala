@@ -34,6 +34,9 @@ object Main {
   }
 }
 
+// going to introduce some purely algebraic structures
+// defined by operations and laws on those operations
+
 // Monoids : things we can combine together
 
 trait Monoid[A] {
@@ -42,7 +45,8 @@ trait Monoid[A] {
 }
 
 // WHERE empty should hold true for this law:
-// combine(empty, A) === combine(empty, a) === a
+// exists and identity element 
+// combine(empty, A) === combine(a, ) === a
 // and associative: combine(combine(A, B), C) === combine(A, combine(B, C))
 
 // scala 3 stuff
@@ -89,9 +93,9 @@ def combineAll[T: Monoid](
 // val myString = combineAll(strings)
 // val myNumber = combineAll(numbers)
 
-// object Main {
-//   def main(args: Array[String]): Unit = {
-//     println(repeatString(5)("ok"))
-//     println(repeatList(5)(List(2)))
-//   }
-// }
+object MainA {
+  def main(args: Array[String]): Unit = {
+    println(repeat(5)("ok"))
+    println(repeat(5)(List(2)))
+  }
+}

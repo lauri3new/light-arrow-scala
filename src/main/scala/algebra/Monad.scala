@@ -41,8 +41,12 @@ extension [T[_]: Monad, A, B, Z](x: T[A])
     f(a)
     Monad[T].of(a)
   })
+  def map(f: A => B) = Monad[T].flatMap(x)(a => Monad[T].of(f(a)))
   def map2(y: T[B])(f: (A, B) => Z) = Monad[T].flatMap(x)(a => Monad[T].map(y)(b => f(a, b)))
 
+def sequence[A[_]: Monad, B](as: List[A[B]]): A[List[B]] = { // what is this function also known as?
+  as.foldRight(Monad[A].of(List[B]()))((a, abs) => Monad[A].flatMap(a)(b => abs.map(bs => b::bs)))
+}
 
 object MonadApp {
   def main(args: Array[String]): Unit = {

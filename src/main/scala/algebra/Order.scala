@@ -7,7 +7,7 @@ package algebra
 // law-abiding instances
 // derived operations
 
-// To write generic code we try to maximise number of instances and derived operations
+// To write reusable and well abstracted code we try to maximise number of instances and derived operations
 // however often these trade against each other
 
 enum Ord {
